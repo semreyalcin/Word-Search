@@ -14,6 +14,8 @@ import java.io.*;
 import java.net.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 public class MultiThreadedServer 
@@ -21,6 +23,12 @@ public class MultiThreadedServer
 	private int clientLimit = 2;
 	ExecutorService pool;
 	ServerSocket socket;
+	
+	// A lock that is used when synchronising
+	// threads read write operations
+	// Simply doesn't allow any read operations
+	// while a write is active
+	private ReadWriteLock lock;
 	
 	public static void main(String[] args) 
 	{
@@ -35,7 +43,6 @@ public class MultiThreadedServer
 
 	public MultiThreadedServer() throws IOException 
 	{
-		
 		try 
 		{
 			// Creating a server socket
@@ -44,6 +51,10 @@ public class MultiThreadedServer
 			
 			// Creating thread pool
 			pool = Executors.newFixedThreadPool(clientLimit);
+			
+			// Creating new read write lock
+			// It is safe to read as long as there is no one writing
+			lock = new ReentrantReadWriteLock();
 			
 			// Giving each client an id
 			int clientId = 0;
@@ -61,7 +72,8 @@ public class MultiThreadedServer
 				+ connection.getInetAddress().getHostAddress() + "\n");
 				
 				// Will create and run a new thread here
-				ClientHandler handler = new ClientHandler(connection,clientId);
+				// Also sending the lock to the handlers
+				ClientHandler handler = new ClientHandler(connection,clientId,lock);
 				pool.execute(new Thread(handler));
 			}
 		}
