@@ -60,7 +60,11 @@ public class Client {
 			
 				// Printing search result
 				str = readMultipleLines(inFromServer);
-				System.out.println(str);
+				// If there is no result returned
+				if(str.startsWith("null"))
+					System.out.println("The word you were searching for could not be found!\n");
+				else
+					System.out.println(str);
 			}
 			else if(str.contentEquals("2"))
 			{

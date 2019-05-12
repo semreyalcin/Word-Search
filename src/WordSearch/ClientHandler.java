@@ -11,21 +11,25 @@ package WordSearch;
 import java.io.*;
 import java.net.*;
 import java.nio.file.FileSystems;
+import java.util.concurrent.locks.ReadWriteLock;
 
 
 public class ClientHandler implements Runnable
 {
-	private Socket connection; //
+	private Socket connection;
 	private int id;
+	private ReadWriteLock lock; 
+	
 	private String menu = "Please enter one of the following options:\n"
 			+ "1- Search word\n"
 			+ "2- Write to file\n"
 			+ "3- Exit\n";
-
-	public ClientHandler(Socket c, int id)
+	
+	public ClientHandler(Socket c, int id, ReadWriteLock lock)
 	{
 		this.connection = c;
 		this.id = id;
+		this.lock = lock;
 	}
 	
 	// The part that will run in the thread
@@ -71,6 +75,8 @@ public class ClientHandler implements Runnable
 				outToClient.writeBytes("Please enter a string to write: \n");
 				str = inFromClient.readLine();
 				
+				System.out.println("Client " + id + " written the string \"" + str + "\" to :" + filename + "\n");
+				
 				// Appending string at the end of given file
 				writeFile(str, filename);
 			
@@ -89,7 +95,7 @@ public class ClientHandler implements Runnable
 			+ connection.getInetAddress().getHostAddress() + "\n");
 			connection.close();
 		}
-		catch (IOException e)
+		catch (IOException | InterruptedException e)
 		{
 			System.err.println(e);
 		}
@@ -156,12 +162,20 @@ public class ClientHandler implements Runnable
 	
 	// Searches the word in the given file
 	// Returns a string which contains path and line info
-	String findWord(String word, String path)
+	String findWord(String word, String path) throws InterruptedException
 	{
+		// Acquiring read lock
+		lock.readLock().lock();
+
 		// Result string to be returned
 		String result = path + " ---> Lines: ";
 		boolean found = false;
-		try(BufferedReader fileReader = new BufferedReader(new FileReader(path)))
+		
+		// Sleeping thread for test purposes
+		//Thread.sleep(2000);
+		//System.out.println(id + " sleeping..\n");
+		
+		try(BufferedReader fileReader = new BufferedReader(new FileReader(path)))	
 		{
 			String line = null;
 			int lineNum = 0;
@@ -180,6 +194,9 @@ public class ClientHandler implements Runnable
 		catch(IOException e)
 		{
 			System.err.println(e);
+		} finally {
+			// Releasing read lock
+			lock.readLock().unlock();
 		}
 		// Return single file result if found any
 		if(found) 
@@ -188,10 +205,16 @@ public class ClientHandler implements Runnable
 	}
 
 	// A function to append given string to end of given file
-	void writeFile(String str, String fileName)
+	void writeFile(String str, String fileName) throws InterruptedException
 	{
+		// Getting write lock so that there is no
+		// Parallel writes and any read while writing
+		lock.writeLock().lock();
 		try
 		{
+			// For sync testing purposes
+			//Thread.sleep(10000);
+			
 			// Getting file path
 			String path = FileSystems.getDefault().getPath(".").toAbsolutePath().toString();
 			path = path.substring(0, path.length()-1) + "files" + File.separator + fileName;
@@ -209,6 +232,9 @@ public class ClientHandler implements Runnable
 		catch(IOException e)
 		{
 			System.err.println(e);
+		} finally {
+			// Releasing write lock
+			lock.writeLock().unlock();
 		}
 	}
 }
